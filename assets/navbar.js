@@ -20,5 +20,6 @@ function loadNavbar(level, activePage) {
     // ปุ่มกลับหน้าแรก
     linksHTML += `<a href="../index.html" class="nav-btn" style="margin-left: auto; border-color: transparent;">🏠 กลับหน้าหลัก</a>`;
 
-    navContainer.innerHTML = linksHTML;
+    // อัปเดต: เพิ่ม <div class="main-nav"> ครอบปุ่มเอาไว้ให้มีพื้นหลังสีกรมท่า
+    navContainer.innerHTML = `<div class="main-nav">${linksHTML}</div>`;
 }
