@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>นโยบายสารเสพติด | ผู้บริหาร</title>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+
+<div class="container">
+    <div class="header">
+        <h1>Dashboard ผู้รับบริการจิตเวช เขตสุขภาพที่ 8</h1>
+        <p>รายงานเจาะลึกนโยบายเรือธงด้านยาเสพติด (มุมมองผู้บริหาร)</p>
+    </div>
+
+    <div id="navbar-container"></div>
+
+    <div class="global-controls" style="display: flex;">
+        <div class="tabs" id="provinceTabs"></div>
+        <div class="toggle-group">
+            <button class="toggle-btn active" id="btnOPD" onclick="setType('OPD')">OPD (ผู้ป่วยนอก)</button>
+            <button class="toggle-btn" id="btnIPD" onclick="setType('IPD')">IPD (ผู้ป่วยใน)</button>
+        </div>
+    </div>
+
+    <div class="content-section">
+        <div class="chart-grid-2">
+            <div class="chart-card">
+                <h3 id="f1xTrendTitle">📈 แนวโน้มผู้ป่วยทั้งหมด vs สารเสพติด (F1x)</h3>
+                <div class="grid-chart-container"><canvas id="f1xTrendChart"></canvas></div>
+            </div>
+            <div class="chart-card">
+                <h3 id="f1xBreakdownTitle">🍩 สัดส่วนรายโรคสารเสพติด ปี 2568</h3>
+                <div class="grid-chart-container"><canvas id="f1xBreakdownChart"></canvas></div>
+            </div>
+        </div>
+
+        <div class="table-responsive">
+            <table id="f1xTable">
+                <thead>
+                    <tr>
+                        <th class="sortable" onclick="handleSort('district')">อำเภอ <span class="sort-icon" id="icon-district"></span></th>
+                        <th class="sortable" onclick="handleSort('allCases')">ผู้ป่วยทุกโรค<br>(ปี 2568) <span class="sort-icon" id="icon-allCases"></span></th>
+                        <th class="sortable" onclick="handleSort('f1xTotal')">รวม F1x<br>(ปี 2568) <span class="sort-icon" id="icon-f1xTotal"></span></th>
+                        <th class="sortable percent-col" onclick="handleSort('f1xPercent')">% F1x <br>(เทียบผู้ป่วยรวม) <span class="sort-icon" id="icon-f1xPercent">🔽</span></th>
+                        <th class="sortable" onclick="handleSort('f15')">💊 ยาบ้า (F15) <span class="sort-icon" id="icon-f15"></span></th>
+                        <th class="sortable" onclick="handleSort('f10')">🍺 สุรา (F10) <span class="sort-icon" id="icon-f10"></span></th>
+                        <th class="sortable" onclick="handleSort('f12')">🌿 กัญชา (F12) <span class="sort-icon" id="icon-f12"></span></th>
+                        <th class="sortable" onclick="handleSort('f19')">🧪 ผสม (F19) <span class="sort-icon" id="icon-f19"></span></th>
+                        <th class="sortable" onclick="handleSort('fOther')">อื่นๆ <span class="sort-icon" id="icon-fOther"></span></th>
+                    </tr>
+                </thead>
+                <tbody id="f1xTableBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="credit-footer">
+        📝 สรุปข้อมูลโดยกลุ่มงานพัฒนาคุณภาพบริการและมาตรฐาน รพ.จิตเวชเลยราชนครินทร์
+    </div>
+</div>
+
+<script src="../data/db_population.js"></script>
+<script src="../data/db_substance.js"></script>
+<script src="../assets/navbar.js"></script>
+
+<script>
+    Chart.defaults.font.family = "'Sarabun', sans-serif";
+    
+    // โหลดเมนู (ระดับ executive, หน้าปัจจุบันคือ drug_policy)
+    loadNavbar('executive', 'drug_policy');
+
+    const provinces = ["เลย", "หนองบัวลำภู", "อุดรธานี", "หนองคาย"];
+    let currentProvince = provinces[0];
+    let currentType = 'OPD'; 
+    let currentSortCol = 'f1xPercent';
+    let sortAsc = false;
+
+    // ประมวลผลข้อมูลดิบจาก db_substance.js (ฟังก์ชันนี้อยู่ในไฟล์ db_substance.js)
+    const f1xDataDict = typeof getParsedF1xData === 'function' ? getParsedF1xData() : {};
+
+    // สร้างปุ่มเลือกจังหวัด
+    const tabContainer = document.getElementById('provinceTabs');
+    provinces.forEach(prov => {
+        const btn = document.createElement('button');
+        btn.className = `tab-btn ${prov === currentProvince ? 'active' : ''}`;
+        btn.innerText = prov;
+        btn.onclick = () => {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            currentProvince = prov;
+            updateF1xView();
+        };
+        tabContainer.appendChild(btn);
+    });
+
+    function setType(type) {
+        currentType = type;
+        document.getElementById('btnOPD').classList.toggle('active', type === 'OPD');
+        document.getElementById('btnIPD').classList.toggle('active', type === 'IPD');
+        updateF1xView();
+    }
+
+    let f1xTrendChartInstance = null;
+    let f1xBreakdownChartInstance = null;
+    
+    function updateF1xView() {
+        const dists = f1xDataDict[currentProvince];
+        if(!dists) {
+            console.error("ไม่พบข้อมูลของจังหวัด: " + currentProvince);
+            return;
+        }
+
+        document.getElementById('f1xTrendTitle').innerText = `📈 แนวโน้มผู้ป่วยทั้งหมด vs สารเสพติด (${currentType} จ.${currentProvince})`;
+        document.getElementById('f1xBreakdownTitle').innerText = `🍩 สัดส่วนรายโรคสารเสพติด ปี 2568 (${currentType} จ.${currentProvince})`;
+
+        let totalAll5Y = [0,0,0,0,0];
+        let totalF1x5Y = [0,0,0,0,0];
+        let brkdwn2568 = { f15: 0, f10: 0, f12: 0, f19: 0, other: 0 };
+
+        let renderData = Object.keys(dists).map(d => {
+            const allGrp = dists[d].allCases || {opd:[0,0,0,0,0], ipd:[0,0,0,0,0]};
+            const f1xGrp = dists[d].f1xTotal || {opd:[0,0,0,0,0], ipd:[0,0,0,0,0]};
+            const f15Grp = dists[d].f15; const f10Grp = dists[d].f10;
+            const f12Grp = dists[d].f12; const f19Grp = dists[d].f19; const othGrp = dists[d].other;
+
+            const allArr = currentType === 'OPD' ? allGrp.opd : allGrp.ipd;
+            const f1xArr = currentType === 'OPD' ? f1xGrp.opd : f1xGrp.ipd;
+            
+            const f15_68 = f15Grp ? (currentType === 'OPD' ? f15Grp.opd[4] : f15Grp.ipd[4]) : 0;
+            const f10_68 = f10Grp ? (currentType === 'OPD' ? f10Grp.opd[4] : f10Grp.ipd[4]) : 0;
+            const f12_68 = f12Grp ? (currentType === 'OPD' ? f12Grp.opd[4] : f12Grp.ipd[4]) : 0;
+            const f19_68 = f19Grp ? (currentType === 'OPD' ? f19Grp.opd[4] : f19Grp.ipd[4]) : 0;
+            const oth_68 = othGrp ? (currentType === 'OPD' ? othGrp.opd[4] : othGrp.ipd[4]) : 0;
+
+            for(let i=0; i<5; i++) {
+                totalAll5Y[i] += allArr[i];
+                totalF1x5Y[i] += f1xArr[i];
+            }
+            brkdwn2568.f15 += f15_68; brkdwn2568.f10 += f10_68; brkdwn2568.f12 += f12_68; brkdwn2568.f19 += f19_68; brkdwn2568.other += oth_68;
+
+            const allCases = allArr[4];
+            const f1xTotal = f1xArr[4];
+            const f1xPercent = allCases > 0 ? (f1xTotal / allCases) * 100 : 0;
+
+            return { district: d, allCases, f1xTotal, f1xPercent, f15: f15_68, f10: f10_68, f12: f12_68, f19: f19_68, fOther: oth_68 };
+        });
+
+        // 1. สร้างกราฟเส้น
+        const ctxTrend = document.getElementById('f1xTrendChart').getContext('2d');
+        if(f1xTrendChartInstance) f1xTrendChartInstance.destroy();
+        f1xTrendChartInstance = new Chart(ctxTrend, {
+            type: 'line',
+            data: {
+                labels: ['ปี 2564', 'ปี 2565', 'ปี 2566', 'ปี 2567', 'ปี 2568'],
+                datasets: [
+                    { label: 'ผู้ป่วยทุกโรค', data: totalAll5Y, borderColor: '#34495e', borderDash: [5, 5], tension: 0.3 },
+                    { label: 'ผู้ป่วยสารเสพติด (F1x)', data: totalF1x5Y, borderColor: '#e74c3c', backgroundColor: 'rgba(231, 76, 60, 0.1)', fill: true, tension: 0.3, borderWidth: 3 }
+                ]
+            },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
+        });
+
+        // 2. สร้างกราฟโดนัท
+        const ctxBreakdown = document.getElementById('f1xBreakdownChart').getContext('2d');
+        if(f1xBreakdownChartInstance) f1xBreakdownChartInstance.destroy();
+        f1xBreakdownChartInstance = new Chart(ctxBreakdown, {
+            type: 'doughnut',
+            data: {
+                labels: ['ยาบ้า (F15)', 'สุรา (F10)', 'กัญชา (F12)', 'ผสม (F19)', 'อื่นๆ'],
+                datasets: [{ data: [brkdwn2568.f15, brkdwn2568.f10, brkdwn2568.f12, brkdwn2568.f19, brkdwn2568.other], backgroundColor: ['#e74c3c', '#f39c12', '#27ae60', '#9b59b6', '#95a5a6'], hoverOffset: 4 }]
+            },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right' } }, cutout: '60%' }
+        });
+
+        // 3. เรียงลำดับตาราง
+        if (currentSortCol) {
+            renderData.sort((a, b) => {
+                let valA = a[currentSortCol], valB = b[currentSortCol];
+                if (currentSortCol === 'district') return sortAsc ? valA.localeCompare(valB, 'th') : valB.localeCompare(valA, 'th');
+                return sortAsc ? valA - valB : valB - valA;
+            });
+        }
+
+        // อัปเดตลูกศร
+        document.querySelectorAll('.sort-icon').forEach(icon => icon.innerText = '');
+        if (currentSortCol) {
+            const iconEl = document.getElementById(`icon-${currentSortCol}`);
+            if (iconEl) iconEl.innerText = sortAsc ? '🔼' : '🔽';
+        }
+
+        // วาดตาราง
+        const tbody = document.getElementById('f1xTableBody');
+        tbody.innerHTML = '';
+        renderData.forEach(d => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${d.district}</td>
+                <td>${d.allCases.toLocaleString()}</td>
+                <td>${d.f1xTotal.toLocaleString()}</td>
+                <td class="percent-col">${d.f1xPercent.toLocaleString(undefined, {minimumFractionDigits: 1, maximumFractionDigits: 1})}%</td>
+                <td style="color:var(--f15-color); font-weight:600;">${d.f15.toLocaleString()}</td>
+                <td style="color:var(--f10-color); font-weight:600;">${d.f10.toLocaleString()}</td>
+                <td style="color:var(--f12-color); font-weight:600;">${d.f12.toLocaleString()}</td>
+                <td style="color:var(--f19-color); font-weight:600;">${d.f19.toLocaleString()}</td>
+                <td style="color:var(--other-color);">${d.fOther.toLocaleString()}</td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+
+    function handleSort(col) {
+        if (currentSortCol === col) sortAsc = !sortAsc; 
+        else { currentSortCol = col; sortAsc = col === 'district' ? true : false; }
+        updateF1xView();
+    }
+
+    // รันการแสดงผลครั้งแรก
+    updateF1xView(); 
+</script>
+</body>
+</html>
