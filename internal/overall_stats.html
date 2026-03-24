@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>สถิติภาพรวมโรงพยาบาล | ทีมงานภายใน</title>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="../assets/style.css">
+    <style>
+        .kpi-summary { display: flex; gap: 20px; margin-bottom: 20px; flex-wrap: wrap; }
+        .kpi-card { flex: 1; min-width: 200px; background: #fff; padding: 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); border-left: 4px solid var(--primary-blue); text-align: center; }
+        .kpi-title { font-size: 1rem; color: #666; margin-bottom: 10px; }
+        .kpi-value { font-size: 2rem; font-weight: 700; color: var(--primary-dark); }
+        .kpi-card.red { border-left-color: var(--danger-red); }
+        .kpi-card.gold { border-left-color: var(--gold-accent); }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header">
+        <h1>Dashboard ผู้รับบริการจิตเวช เขตสุขภาพที่ 8</h1>
+        <p>สถิติภาพรวมโรงพยาบาล (Performance KPIs) ระดับ 15 ปี</p>
+    </div>
+
+    <div id="navbar-container"></div>
+
+    <div class="content-section">
+        
+        <div class="kpi-summary" id="kpiSummary"></div>
+
+        <div class="chart-grid-2">
+            <div class="chart-card">
+                <h3>ปริมาณผู้รับบริการ (OPD vs IPD)</h3>
+                <div class="grid-chart-container"><canvas id="volumeChart"></canvas></div>
+            </div>
+            <div class="chart-card">
+                <h3>ประสิทธิภาพการบริหารเตียง</h3>
+                <div class="grid-chart-container"><canvas id="efficiencyChart"></canvas></div>
+            </div>
+        </div>
+
+        <div class="table-responsive">
+            <table id="statsTable">
+                <thead>
+                    <tr>
+                        <th>ปีงบประมาณ</th>
+                        <th>OPD (ครั้ง)</th>
+                        <th>IPD (ครั้ง)</th>
+                        <th>วันนอนเฉลี่ย (วัน)</th>
+                        <th>อัตราครองเตียง (%)</th>
+                    </tr>
+                </thead>
+                <tbody id="statsTableBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="credit-footer">
+        📝 สรุปข้อมูลโดยกลุ่มงานพัฒนาคุณภาพบริการและมาตรฐาน รพ.จิตเวชเลยราชนครินทร์
+    </div>
+</div>
+
+<script src="../data/db_hospital_stats.js"></script>
+<script src="../assets/navbar.js"></script>
+
+<script>
+    Chart.defaults.font.family = "'Sarabun', sans-serif";
+    loadNavbar('internal', 'overall_stats');
+
+    // ดึงข้อมูลปี 2568 (Index 13) มาโชว์เป็นการ์ดสรุป เพราะ 2569 มีแค่ 3 เดือน
+    const lastFullYear = hospitalOverallStats[13]; 
+    document.getElementById('kpiSummary').innerHTML = `
+        <div class="kpi-card">
+            <div class="kpi-title">ผู้ป่วยนอก (ปี 68)</div>
+            <div class="kpi-value">${lastFullYear.opd.toLocaleString()} <span style="font-size:1rem;font-weight:400;">ครั้ง</span></div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-title">ผู้ป่วยใน (ปี 68)</div>
+            <div class="kpi-value">${lastFullYear.ipd.toLocaleString()} <span style="font-size:1rem;font-weight:400;">ครั้ง</span></div>
+        </div>
+        <div class="kpi-card gold">
+            <div class="kpi-title">อัตราครองเตียง (ปี 68)</div>
+            <div class="kpi-value">${lastFullYear.occRate}%</div>
+        </div>
+        <div class="kpi-card red">
+            <div class="kpi-title">วันนอนเฉลี่ย (ปี 68)</div>
+            <div class="kpi-value">${lastFullYear.alos} <span style="font-size:1rem;font-weight:400;">วัน</span></div>
+        </div>
+    `;
+
+    // เตรียมข้อมูลสำหรับกราฟ
+    const labels = hospitalOverallStats.map(d => d.year);
+    const opdData = hospitalOverallStats.map(d => d.opd);
+    const ipdData = hospitalOverallStats.map(d => d.ipd);
+    const alosData = hospitalOverallStats.map(d => d.alos);
+    const occData = hospitalOverallStats.map(d => d.occRate);
+
+    // กราฟ 1: ปริมาณงาน (Dual Y-Axis)
+    new Chart(document.getElementById('volumeChart').getContext('2d'), {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [
+                { label: 'OPD (แกนซ้าย)', data: opdData, backgroundColor: '#3498db', yAxisID: 'y' },
+                { label: 'IPD (แกนขวา)', data: ipdData, type: 'line', borderColor: '#e74c3c', backgroundColor: '#e74c3c', borderWidth: 3, tension: 0.3, yAxisID: 'y1' }
+            ]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            plugins: { legend: { position: 'bottom' } },
+            scales: {
+                y: { type: 'linear', display: true, position: 'left', title: { display: true, text: 'ครั้ง (OPD)', font: {family: 'Sarabun'} } },
+                y1: { type: 'linear', display: true, position: 'right', title: { display: true, text: 'ครั้ง (IPD)', font: {family: 'Sarabun'} }, grid: { drawOnChartArea: false } }
+            }
+        }
+    });
+
+    // กราฟ 2: ประสิทธิภาพเตียง (Dual Y-Axis)
+    new Chart(document.getElementById('efficiencyChart').getContext('2d'), {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [
+                { label: 'อัตราครองเตียง % (แกนซ้าย)', data: occData, borderColor: '#f1c40f', backgroundColor: 'rgba(241, 196, 15, 0.1)', fill: true, borderWidth: 3, tension: 0.3, yAxisID: 'y' },
+                { label: 'วันนอนเฉลี่ย (แกนขวา)', data: alosData, borderColor: '#2ecc71', borderWidth: 3, borderDash: [5, 5], tension: 0.3, yAxisID: 'y1' }
+            ]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            plugins: { legend: { position: 'bottom' } },
+            scales: {
+                y: { type: 'linear', display: true, position: 'left', title: { display: true, text: 'ร้อยละ (%)', font: {family: 'Sarabun'} }, min: 0 },
+                y1: { type: 'linear', display: true, position: 'right', title: { display: true, text: 'วัน', font: {family: 'Sarabun'} }, min: 0, grid: { drawOnChartArea: false } }
+            }
+        }
+    });
+
+    // แสดงผลข้อมูลลงตาราง
+    const tbody = document.getElementById('statsTableBody');
+    hospitalOverallStats.forEach(d => {
+        // ไฮไลท์บรรทัด 2569 (3 เดือน) ให้สังเกตง่าย
+        const isCurrentYear = d.year.includes('2569');
+        const style = isCurrentYear ? 'background-color: #fdf2e9; font-weight: 500;' : '';
+        
+        tbody.innerHTML += `
+            <tr style="${style}">
+                <td style="text-align: center;">${d.year}</td>
+                <td>${d.opd.toLocaleString()}</td>
+                <td>${d.ipd.toLocaleString()}</td>
+                <td style="color: #2ecc71; font-weight: 600;">${d.alos.toFixed(2)}</td>
+                <td style="color: #e67e22; font-weight: 600;">${d.occRate.toFixed(2)}%</td>
+            </tr>
+        `;
+    });
+</script>
+
+</body>
+</html>
