@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ภูมิลำเนาผู้ป่วย | ทีมงานภายใน</title>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+
+<div class="container">
+    <div class="header">
+        <h1>Dashboard ผู้รับบริการจิตเวช เขตสุขภาพที่ 8</h1>
+        <p>รายงานร้อยละภูมิลำเนาผู้ป่วย รพ.จิตเวชเลยราชนครินทร์</p>
+    </div>
+
+    <div id="navbar-container"></div>
+
+    <div class="global-controls" style="display: flex; justify-content: flex-end;">
+        <div class="toggle-group">
+            <button class="toggle-btn active" id="btnOPD" onclick="setType('OPD')">OPD (ผู้ป่วยนอก)</button>
+            <button class="toggle-btn" id="btnIPD" onclick="setType('IPD')">IPD (ผู้ป่วยใน)</button>
+        </div>
+    </div>
+
+    <div class="content-section">
+        <h2 id="domicileTitle" style="text-align: center; color: var(--primary-dark); margin-bottom: 20px;">ร้อยละภูมิลำเนาของผู้ป่วย OPD (2564-2568)</h2>
+        
+        <div class="main-chart-container">
+            <canvas id="domicileChart"></canvas>
+        </div>
+        
+        <div class="table-responsive">
+            <table class="domicile-table">
+                <thead>
+                    <tr>
+                        <th rowspan="2" style="vertical-align: middle;">จังหวัด</th>
+                        <th colspan="2">2564</th><th colspan="2">2565</th><th colspan="2">2566</th><th colspan="2">2567</th><th colspan="2">2568</th>
+                    </tr>
+                    <tr>
+                        <th>ราย</th><th>%</th><th>ราย</th><th>%</th><th>ราย</th><th>%</th><th>ราย</th><th>%</th><th>ราย</th><th>%</th>
+                    </tr>
+                </thead>
+                <tbody id="domicileTableBody"></tbody>
+                <tfoot id="domicileTableFoot"></tfoot>
+            </table>
+        </div>
+    </div>
+
+    <div class="credit-footer">
+        📝 สรุปข้อมูลโดยกลุ่มงานพัฒนาคุณภาพบริการและมาตรฐาน รพ.จิตเวชเลยราชนครินทร์
+    </div>
+</div>
+
+<script src="../data/db_domicile.js"></script>
+<script src="../assets/navbar.js"></script>
+
+<script>
+    Chart.defaults.font.family = "'Sarabun', sans-serif";
+    loadNavbar('internal', 'domicile');
+
+    let currentType = 'OPD';
+    let domicileChartInstance = null;
+
+    function setType(type) {
+        currentType = type;
+        document.getElementById('btnOPD').classList.toggle('active', type === 'OPD');
+        document.getElementById('btnIPD').classList.toggle('active', type === 'IPD');
+        
+        document.getElementById('domicileTitle').innerText = `ร้อยละภูมิลำเนาของผู้ป่วย ${currentType} รพ.จิตเวชเลยราชนครินทร์ (2564-2568)`;
+        updateDomicileView();
+    }
+
+    function updateDomicileView() {
+        const data = domicileData[currentType];
+        const ctx = document.getElementById('domicileChart').getContext('2d');
+        
+        // วาดกราฟแท่งเปรียบเทียบ 5 ปี
+        if(domicileChartInstance) domicileChartInstance.destroy();
+        domicileChartInstance = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: ['เลย', 'หนองบัวลำภู', 'หนองคาย', 'อุดรธานี'],
+                datasets: [
+                    { label: '2564', data: [data['เลย'].percent[0], data['หนองบัวลำภู'].percent[0], data['หนองคาย'].percent[0], data['อุดรธานี'].percent[0]], backgroundColor: '#bdc3c7', borderRadius: 4 },
+                    { label: '2565', data: [data['เลย'].percent[1], data['หนองบัวลำภู'].percent[1], data['หนองคาย'].percent[1], data['อุดรธานี'].percent[1]], backgroundColor: '#3498db', borderRadius: 4 },
+                    { label: '2566', data: [data['เลย'].percent[2], data['หนองบัวลำภู'].percent[2], data['หนองคาย'].percent[2], data['อุดรธานี'].percent[2]], backgroundColor: '#e74c3c', borderRadius: 4 },
+                    { label: '2567', data: [data['เลย'].percent[3], data['หนองบัวลำภู'].percent[3], data['หนองคาย'].percent[3], data['อุดรธานี'].percent[3]], backgroundColor: '#f1c40f', borderRadius: 4 },
+                    { label: '2568', data: [data['เลย'].percent[4], data['หนองบัวลำภู'].percent[4], data['หนองคาย'].percent[4], data['อุดรธานี'].percent[4]], backgroundColor: '#2ecc71', borderRadius: 4 }
+                ]
+            },
+            options: { 
+                responsive: true, 
+                maintainAspectRatio: false, 
+                plugins: { legend: { position: 'top' }, tooltip: { callbacks: { label: function(c) { return c.dataset.label + ': ' + c.parsed.y + '%'; } } } }, 
+                scales: { y: { beginAtZero: true, max: Math.max(...data['เลย'].percent) + 15, ticks: { callback: function(v) { return v + '%'; } } } } 
+            }
+        });
+
+        // วาดตารางข้อมูล
+        const tbody = document.getElementById('domicileTableBody');
+        tbody.innerHTML = '';
+        ['เลย', 'หนองบัวลำภู', 'หนองคาย', 'อุดรธานี'].forEach((prov, idx) => {
+            const bgClass = idx === 0 ? 'bg-red-light' : (idx === 3 ? 'bg-orange-light' : 'bg-green-light');
+            const d = data[prov];
+            tbody.innerHTML += `<tr>
+                <td>${prov}</td>
+                <td>${d.count[0].toLocaleString()}</td><td class="${bgClass}">${d.percent[0]}</td>
+                <td>${d.count[1].toLocaleString()}</td><td class="${bgClass}">${d.percent[1]}</td>
+                <td>${d.count[2].toLocaleString()}</td><td class="${bgClass}">${d.percent[2]}</td>
+                <td>${d.count[3].toLocaleString()}</td><td class="${bgClass}">${d.percent[3]}</td>
+                <td>${d.count[4].toLocaleString()}</td><td class="${bgClass}">${d.percent[4]}</td>
+            </tr>`;
+        });
+
+        const tfoot = document.getElementById('domicileTableFoot');
+        const t = data['รวม'];
+        tfoot.innerHTML = `<tr>
+            <td style="text-align: center; color: var(--primary-dark);">รวม</td>
+            <td style="text-align: center;">${t.count[0].toLocaleString()}</td><td style="text-align: center;">100</td>
+            <td style="text-align: center;">${t.count[1].toLocaleString()}</td><td style="text-align: center;">100</td>
+            <td style="text-align: center;">${t.count[2].toLocaleString()}</td><td style="text-align: center;">100</td>
+            <td style="text-align: center;">${t.count[3].toLocaleString()}</td><td style="text-align: center;">100</td>
+            <td style="text-align: center;">${t.count[4].toLocaleString()}</td><td style="text-align: center;">100</td>
+        </tr>`;
+    }
+
+    // โหลดครั้งแรก
+    updateDomicileView();
+</script>
+
+</body>
+</html>
