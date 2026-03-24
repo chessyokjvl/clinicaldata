@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ระบบสารสนเทศยุทธศาสตร์ | รพ.จิตเวชเลยราชนครินทร์</title>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="assets/style.css">
+    <style>
+        .landing-container { max-width: 900px; margin: 50px auto; padding: 20px; text-align: center; }
+        .hero-title { color: var(--gold-accent); font-size: 2.5rem; margin-bottom: 10px; }
+        .hero-subtitle { color: #fff; font-size: 1.2rem; font-weight: 300; margin-bottom: 40px; }
+        .portal-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 30px; }
+        .portal-card { background: #fff; border-radius: 16px; padding: 40px 20px; text-decoration: none; color: var(--primary-dark); box-shadow: 0 10px 30px rgba(0,0,0,0.2); transition: transform 0.3s, box-shadow 0.3s; display: flex; flex-direction: column; align-items: center; }
+        .portal-card:hover { transform: translateY(-5px); box-shadow: 0 15px 40px rgba(0,0,0,0.3); border-bottom: 4px solid var(--gold-accent); }
+        .portal-icon { font-size: 4rem; margin-bottom: 20px; }
+        .portal-title { font-size: 1.5rem; font-weight: 600; margin-bottom: 10px; }
+        .portal-desc { color: #666; font-size: 1rem; }
+    </style>
+</head>
+<body>
+    <div class="landing-container">
+        <h1 class="hero-title">Dashboard ผู้รับบริการจิตเวช เขตสุขภาพที่ 8</h1>
+        <p class="hero-subtitle">ระบบสารสนเทศเพื่อการบริหารจัดการข้อมูลยุทธศาสตร์และนโยบายเรือธง (ยาเสพติด)</p>
+        
+        <div class="portal-grid">
+            <a href="executive/overview.html" class="portal-card">
+                <div class="portal-icon">📊</div>
+                <div class="portal-title">สำหรับผู้บริหาร (Executive)</div>
+                <div class="portal-desc">สรุปภาพรวม 5 อันดับโรค นโยบายเรือธง และแนวโน้มสถิติระดับเขตสุขภาพ</div>
+            </a>
+            
+            <a href="internal/prevalence.html" class="portal-card">
+                <div class="portal-icon">🏥</div>
+                <div class="portal-title">สำหรับทีมงาน (Internal)</div>
+                <div class="portal-desc">เจาะลึกสถิติความชุกรายอำเภอ สถิติภูมิลำเนาผู้ป่วย และตารางข้อมูลดิบ</div>
+            </a>
+        </div>
+        
+        <div class="credit-footer" style="background: transparent; color: rgba(255,255,255,0.7); text-align: center; margin-top: 50px; border: none;">
+            📝 สรุปข้อมูลโดยกลุ่มงานพัฒนาคุณภาพบริการและมาตรฐาน รพ.จิตเวชเลยราชนครินทร์
+        </div>
+    </div>
+</body>
+</html>
