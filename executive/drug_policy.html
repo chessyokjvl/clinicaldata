@@ -42,7 +42,7 @@
             <table id="f1xTable">
                 <thead>
                     <tr>
-                        <th class="sortable" onclick="handleSort('district')">อำเภอ <span class="sort-icon" id="icon-district"></span></th>
+                        <th class="sortable" id="header-district" onclick="handleSort('district')">อำเภอ <span class="sort-icon" id="icon-district"></span></th>
                         <th class="sortable" onclick="handleSort('allCases')">ผู้ป่วยทุกโรค<br>(ปี 2568) <span class="sort-icon" id="icon-allCases"></span></th>
                         <th class="sortable" onclick="handleSort('f1xTotal')">รวม F1x<br>(ปี 2568) <span class="sort-icon" id="icon-f1xTotal"></span></th>
                         <th class="sortable percent-col" onclick="handleSort('f1xPercent')">% F1x <br>(เทียบผู้ป่วยรวม) <span class="sort-icon" id="icon-f1xPercent">🔽</span></th>
@@ -69,23 +69,22 @@
 
 <script>
     Chart.defaults.font.family = "'Sarabun', sans-serif";
-    
-    // โหลดเมนู (ระดับ executive, หน้าปัจจุบันคือ drug_policy)
     loadNavbar('executive', 'drug_policy');
 
-    const provinces = ["เลย", "หนองบัวลำภู", "อุดรธานี", "หนองคาย"];
+    // 🌟 อัปเดต: เพิ่มแท็บ "รวม 4 จังหวัด" ไว้ด้านหน้าสุด
+    const provinces = ["รวม 4 จังหวัด", "เลย", "หนองบัวลำภู", "อุดรธานี", "หนองคาย"];
     let currentProvince = provinces[0];
     let currentType = 'OPD'; 
     let currentSortCol = 'f1xPercent';
     let sortAsc = false;
 
-    // ประมวลผลข้อมูลดิบจาก db_substance.js (ฟังก์ชันนี้อยู่ในไฟล์ db_substance.js)
     const f1xDataDict = typeof getParsedF1xData === 'function' ? getParsedF1xData() : {};
 
-    // สร้างปุ่มเลือกจังหวัด
     const tabContainer = document.getElementById('provinceTabs');
     provinces.forEach(prov => {
         const btn = document.createElement('button');
+        // ไฮไลท์สีพิเศษสำหรับแท็บรวม
+        if(prov === "รวม 4 จังหวัด") btn.style.fontWeight = 'bold';
         btn.className = `tab-btn ${prov === currentProvince ? 'active' : ''}`;
         btn.innerText = prov;
         btn.onclick = () => {
@@ -108,48 +107,88 @@
     let f1xBreakdownChartInstance = null;
     
     function updateF1xView() {
-        const dists = f1xDataDict[currentProvince];
-        if(!dists) {
-            console.error("ไม่พบข้อมูลของจังหวัด: " + currentProvince);
-            return;
-        }
-
-        document.getElementById('f1xTrendTitle').innerText = `📈 แนวโน้มผู้ป่วยทั้งหมด vs สารเสพติด (${currentType} จ.${currentProvince})`;
-        document.getElementById('f1xBreakdownTitle').innerText = `🍩 สัดส่วนรายโรคสารเสพติด ปี 2568 (${currentType} จ.${currentProvince})`;
-
+        let renderData = [];
         let totalAll5Y = [0,0,0,0,0];
         let totalF1x5Y = [0,0,0,0,0];
         let brkdwn2568 = { f15: 0, f10: 0, f12: 0, f19: 0, other: 0 };
 
-        let renderData = Object.keys(dists).map(d => {
-            const allGrp = dists[d].allCases || {opd:[0,0,0,0,0], ipd:[0,0,0,0,0]};
-            const f1xGrp = dists[d].f1xTotal || {opd:[0,0,0,0,0], ipd:[0,0,0,0,0]};
-            const f15Grp = dists[d].f15; const f10Grp = dists[d].f10;
-            const f12Grp = dists[d].f12; const f19Grp = dists[d].f19; const othGrp = dists[d].other;
+        // 🌟 Logic การดึงและรวมข้อมูล (Aggregator)
+        if (currentProvince === "รวม 4 จังหวัด") {
+            document.getElementById('f1xTrendTitle').innerText = `📈 แนวโน้มผู้ป่วยทั้งหมด vs สารเสพติด (${currentType} ภาพรวมเขตสุขภาพที่ 8)`;
+            document.getElementById('f1xBreakdownTitle').innerText = `🍩 สัดส่วนรายโรคสารเสพติด ปี 2568 (${currentType} ภาพรวมเขตสุขภาพที่ 8)`;
+            document.getElementById('header-district').innerHTML = `จังหวัด <span class="sort-icon" id="icon-district"></span>`;
 
-            const allArr = currentType === 'OPD' ? allGrp.opd : allGrp.ipd;
-            const f1xArr = currentType === 'OPD' ? f1xGrp.opd : f1xGrp.ipd;
-            
-            const f15_68 = f15Grp ? (currentType === 'OPD' ? f15Grp.opd[4] : f15Grp.ipd[4]) : 0;
-            const f10_68 = f10Grp ? (currentType === 'OPD' ? f10Grp.opd[4] : f10Grp.ipd[4]) : 0;
-            const f12_68 = f12Grp ? (currentType === 'OPD' ? f12Grp.opd[4] : f12Grp.ipd[4]) : 0;
-            const f19_68 = f19Grp ? (currentType === 'OPD' ? f19Grp.opd[4] : f19Grp.ipd[4]) : 0;
-            const oth_68 = othGrp ? (currentType === 'OPD' ? othGrp.opd[4] : othGrp.ipd[4]) : 0;
+            ["เลย", "หนองบัวลำภู", "อุดรธานี", "หนองคาย"].forEach(prov => {
+                const dists = f1xDataDict[prov];
+                if(!dists) return;
 
-            for(let i=0; i<5; i++) {
-                totalAll5Y[i] += allArr[i];
-                totalF1x5Y[i] += f1xArr[i];
+                let pAllCases = 0, pF1xTotal = 0, pF15 = 0, pF10 = 0, pF12 = 0, pF19 = 0, pOther = 0;
+                
+                Object.keys(dists).forEach(d => {
+                    const allGrp = dists[d].allCases || {opd:[0,0,0,0,0], ipd:[0,0,0,0,0]};
+                    const f1xGrp = dists[d].f1xTotal || {opd:[0,0,0,0,0], ipd:[0,0,0,0,0]};
+                    const allArr = currentType === 'OPD' ? allGrp.opd : allGrp.ipd;
+                    const f1xArr = f1xGrp.opd ? (currentType === 'OPD' ? f1xGrp.opd : f1xGrp.ipd) : [0,0,0,0,0];
+
+                    for(let i=0; i<5; i++) {
+                        totalAll5Y[i] += allArr[i];
+                        totalF1x5Y[i] += f1xArr[i];
+                    }
+
+                    pAllCases += allArr[4];
+                    pF1xTotal += f1xArr[4];
+
+                    const f15_68 = dists[d].f15 ? (currentType === 'OPD' ? dists[d].f15.opd[4] : dists[d].f15.ipd[4]) : 0;
+                    const f10_68 = dists[d].f10 ? (currentType === 'OPD' ? dists[d].f10.opd[4] : dists[d].f10.ipd[4]) : 0;
+                    const f12_68 = dists[d].f12 ? (currentType === 'OPD' ? dists[d].f12.opd[4] : dists[d].f12.ipd[4]) : 0;
+                    const f19_68 = dists[d].f19 ? (currentType === 'OPD' ? dists[d].f19.opd[4] : dists[d].f19.ipd[4]) : 0;
+                    const oth_68 = dists[d].other ? (currentType === 'OPD' ? dists[d].other.opd[4] : dists[d].other.ipd[4]) : 0;
+
+                    pF15 += f15_68; pF10 += f10_68; pF12 += f12_68; pF19 += f19_68; pOther += oth_68;
+                    brkdwn2568.f15 += f15_68; brkdwn2568.f10 += f10_68; brkdwn2568.f12 += f12_68; brkdwn2568.f19 += f19_68; brkdwn2568.other += oth_68;
+                });
+
+                const f1xPercent = pAllCases > 0 ? (pF1xTotal / pAllCases) * 100 : 0;
+                renderData.push({ district: prov, allCases: pAllCases, f1xTotal: pF1xTotal, f1xPercent, f15: pF15, f10: pF10, f12: pF12, f19: pF19, fOther: pOther });
+            });
+
+        } else {
+            // เจาะลึกรายจังหวัด
+            document.getElementById('f1xTrendTitle').innerText = `📈 แนวโน้มผู้ป่วยทั้งหมด vs สารเสพติด (${currentType} จ.${currentProvince})`;
+            document.getElementById('f1xBreakdownTitle').innerText = `🍩 สัดส่วนรายโรคสารเสพติด ปี 2568 (${currentType} จ.${currentProvince})`;
+            document.getElementById('header-district').innerHTML = `อำเภอ <span class="sort-icon" id="icon-district"></span>`;
+
+            const dists = f1xDataDict[currentProvince];
+            if(dists) {
+                renderData = Object.keys(dists).map(d => {
+                    const allGrp = dists[d].allCases || {opd:[0,0,0,0,0], ipd:[0,0,0,0,0]};
+                    const f1xGrp = dists[d].f1xTotal || {opd:[0,0,0,0,0], ipd:[0,0,0,0,0]};
+                    const allArr = currentType === 'OPD' ? allGrp.opd : allGrp.ipd;
+                    const f1xArr = currentType === 'OPD' ? f1xGrp.opd : f1xGrp.ipd;
+                    
+                    for(let i=0; i<5; i++) {
+                        totalAll5Y[i] += allArr[i];
+                        totalF1x5Y[i] += f1xArr[i];
+                    }
+
+                    const f15_68 = dists[d].f15 ? (currentType === 'OPD' ? dists[d].f15.opd[4] : dists[d].f15.ipd[4]) : 0;
+                    const f10_68 = dists[d].f10 ? (currentType === 'OPD' ? dists[d].f10.opd[4] : dists[d].f10.ipd[4]) : 0;
+                    const f12_68 = dists[d].f12 ? (currentType === 'OPD' ? dists[d].f12.opd[4] : dists[d].f12.ipd[4]) : 0;
+                    const f19_68 = dists[d].f19 ? (currentType === 'OPD' ? dists[d].f19.opd[4] : dists[d].f19.ipd[4]) : 0;
+                    const oth_68 = dists[d].other ? (currentType === 'OPD' ? dists[d].other.opd[4] : dists[d].other.ipd[4]) : 0;
+
+                    brkdwn2568.f15 += f15_68; brkdwn2568.f10 += f10_68; brkdwn2568.f12 += f12_68; brkdwn2568.f19 += f19_68; brkdwn2568.other += oth_68;
+
+                    const allCases = allArr[4];
+                    const f1xTotal = f1xArr[4];
+                    const f1xPercent = allCases > 0 ? (f1xTotal / allCases) * 100 : 0;
+
+                    return { district: d, allCases, f1xTotal, f1xPercent, f15: f15_68, f10: f10_68, f12: f12_68, f19: f19_68, fOther: oth_68 };
+                });
             }
-            brkdwn2568.f15 += f15_68; brkdwn2568.f10 += f10_68; brkdwn2568.f12 += f12_68; brkdwn2568.f19 += f19_68; brkdwn2568.other += oth_68;
+        }
 
-            const allCases = allArr[4];
-            const f1xTotal = f1xArr[4];
-            const f1xPercent = allCases > 0 ? (f1xTotal / allCases) * 100 : 0;
-
-            return { district: d, allCases, f1xTotal, f1xPercent, f15: f15_68, f10: f10_68, f12: f12_68, f19: f19_68, fOther: oth_68 };
-        });
-
-        // 1. สร้างกราฟเส้น
+        // วาดกราฟเส้น
         const ctxTrend = document.getElementById('f1xTrendChart').getContext('2d');
         if(f1xTrendChartInstance) f1xTrendChartInstance.destroy();
         f1xTrendChartInstance = new Chart(ctxTrend, {
@@ -164,7 +203,7 @@
             options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
         });
 
-        // 2. สร้างกราฟโดนัท
+        // วาดโดนัท
         const ctxBreakdown = document.getElementById('f1xBreakdownChart').getContext('2d');
         if(f1xBreakdownChartInstance) f1xBreakdownChartInstance.destroy();
         f1xBreakdownChartInstance = new Chart(ctxBreakdown, {
@@ -176,7 +215,7 @@
             options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right' } }, cutout: '60%' }
         });
 
-        // 3. เรียงลำดับตาราง
+        // เรียงตาราง
         if (currentSortCol) {
             renderData.sort((a, b) => {
                 let valA = a[currentSortCol], valB = b[currentSortCol];
@@ -184,15 +223,12 @@
                 return sortAsc ? valA - valB : valB - valA;
             });
         }
-
-        // อัปเดตลูกศร
         document.querySelectorAll('.sort-icon').forEach(icon => icon.innerText = '');
         if (currentSortCol) {
             const iconEl = document.getElementById(`icon-${currentSortCol}`);
             if (iconEl) iconEl.innerText = sortAsc ? '🔼' : '🔽';
         }
 
-        // วาดตาราง
         const tbody = document.getElementById('f1xTableBody');
         tbody.innerHTML = '';
         renderData.forEach(d => {
@@ -218,7 +254,6 @@
         updateF1xView();
     }
 
-    // รันการแสดงผลครั้งแรก
     updateF1xView(); 
 </script>
 </body>
