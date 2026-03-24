@@ -12,14 +12,12 @@ function loadNavbar(level, activePage) {
         `;
     } else if (level === 'internal') {
         linksHTML = `
+            <a href="overall_stats.html" class="nav-btn ${activePage === 'overall_stats' ? 'active' : ''}">📈 สถิติภาพรวม รพ.</a>
             <a href="prevalence.html" class="nav-btn ${activePage === 'prevalence' ? 'active' : ''}">🏥 ความชุกและสถิติรายอำเภอ</a>
             <a href="domicile.html" class="nav-btn ${activePage === 'domicile' ? 'active' : ''}">📍 ภูมิลำเนาผู้ป่วย (OPD/IPD)</a>
         `;
     }
 
-    // ปุ่มกลับหน้าแรก
     linksHTML += `<a href="../index.html" class="nav-btn" style="margin-left: auto; border-color: transparent;">🏠 กลับหน้าหลัก</a>`;
-
-    // อัปเดต: เพิ่ม <div class="main-nav"> ครอบปุ่มเอาไว้ให้มีพื้นหลังสีกรมท่า
     navContainer.innerHTML = `<div class="main-nav">${linksHTML}</div>`;
 }
